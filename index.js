@@ -75,3 +75,16 @@ app.put("/updateUsuarios", async (request, response) => {
         response.status(500).send("Erro de conexão com o servidor")
     }
 })
+
+app.put("/deleteUsuarios", async (request, response) => {
+    try {
+        const { ID }  = pool.query(`DELETE FROM Usuarios
+            WHERE ID = ${ ID }`)
+
+        response.status(200).send("Usiário deletado com sucesso!")
+        
+    } catch (error) {
+        console.error(error)
+        response.status(500).send("Erro de conexão com o servidor")
+    }
+})
