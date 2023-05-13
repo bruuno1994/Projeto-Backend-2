@@ -7,7 +7,7 @@ const app = express()
 app.use(express.json())
 
 app.listen(5000, () => {
-    console.log("O servidor está ativo na porta 8080!");
+    console.log("O servidor está ativo na porta 5000!");
 })
 
 const segredo = "MeuSegredo"
@@ -32,10 +32,10 @@ app.get("/", (request, response) => {
     response.status(200).send("Olá mundo!")
 })
 
-app.get("/getUsuarios", async (request, response) => {
+app.get("/users", async (request, response) => {
     try {
         const client = await pool.connect()
-        const { rows } = await client.query("SELECT * FROM Usuarios")
+        const { rows } = await client.query(`SELECT * FROM Usuarios`)
 
         console.table(rows)
         response.status(200).send(rows)
@@ -46,10 +46,37 @@ app.get("/getUsuarios", async (request, response) => {
     }
 })
 
-app.post("/createUsuarios", async (request, response) => {
+app.post("/login", async (req, res) => {
+    const { email, senha } = req.body;
+
+    const client = await pool.connect();
+
+    // Verificar se esse email existe
+    const findUser = await client.query(`SELECT * FROM Usuarios where email='${email}'`);
+    if (!findUser) {
+        return res.status(401).json({ error: 'Usuario não existe' });
+    }
+    
+    // Verificar se a senha esta correta.
+    if ((findUser.rows[0].senha) !== senha) {
+        return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    const { id, nome } = findUser.rows[0]
+    return res.status(200).json({
+        user: {
+            id,
+            nome,
+            email
+        },
+        token : jwt.sign({id}, segredo),
+    });
+})
+
+app.post("/users", async (request, response) => {
     try {
-        const { ID, Nome, Email, Senha }  = request.body
-        pool.query(`INSERT INTO Usuarios (ID, Nome, Email, Senha) VALUES (${ID}, '${Nome}', '${Email}', '${Senha}')`)
+        const { nome, email, senha }  = request.body
+        pool.query(`INSERT INTO Usuarios ( nome, email, senha) VALUES ('${nome}', '${email}', '${senha}')`)
 
         response.status(200).send("Usuário inserido com sucesso!")
 
@@ -59,14 +86,15 @@ app.post("/createUsuarios", async (request, response) => {
     }
 })
 
-app.put("/updateUsuarios", async (request, response) => {
+app.put("/users/:id", async (request, response) => {
     try {
-        const { ID, Nome, Email, Senha }  = request.body
-        const { rows } = pool.query(`UPDATE Usuarios
-            SET Nome = '${ Nome }',
-            SET Email = '${ Email }',
-            SET Senha = '${ Senha }'
-            WHERE ID = ${ ID }`)
+        const { id } = request.params
+        const { nome, email, senha } = request.body
+
+        const client = await pool.connect()
+        const atualizar = await client.query(`UPDATE Usuarios
+            SET nome = '${ nome }', email = '${ email }', senha = '${ senha }'
+            WHERE id = ${ id }`)
 
         response.status(200).send("Alteração executada com sucesso!")
         
@@ -76,12 +104,13 @@ app.put("/updateUsuarios", async (request, response) => {
     }
 })
 
-app.put("/deleteUsuarios", async (request, response) => {
+app.delete("/users/:id", async (request, response) => {
     try {
-        const { ID }  = pool.query(`DELETE FROM Usuarios
-            WHERE ID = ${ ID }`)
 
-        response.status(200).send("Usiário deletado com sucesso!")
+        const { id } = request.params 
+        const res = await pool.query(`DELETE FROM Usuarios WHERE id = ${ id }`)
+        console.log(res)
+        response.status(200).send("Usuário deletado com sucesso!")
         
     } catch (error) {
         console.error(error)
